@@ -4,11 +4,23 @@ from fastapi.middleware.cors import CORSMiddleware
 import sqlite3
 import json
 from datetime import datetime
+import google.generativeai as genai
+import os
 
+# 1. Initialize 'app' FIRST so decorators work
 app = FastAPI()
 
+# --- CORS ---
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
+
 # --- Database Setup (SQLite) ---
-def initpV_db():
+def init_db():
     conn = sqlite3.connect('blog.db')
     c = conn.cursor()
     # Schema designed to store Lexical JSON state + metadata
@@ -24,18 +36,12 @@ def initpV_db():
     conn.commit()
     conn.close()
 
-initpV_db()
-
-# --- CORS ---
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
-)
+init_db()
 
 # --- Pydantic Models ---
+class AIRequest(BaseModel):
+    text: str
+
 class PostCreate(BaseModel):
     content: str # Stores JSON string from Lexical
 
@@ -43,6 +49,14 @@ class PostUpdate(BaseModel):
     content: str
 
 # --- Endpoints ---
+
+@app.post("/api/ai/generate")
+def generate_summary(req: AIRequest):
+    # Configure your API key here or using environment variables if you want it to work
+    # genai.configure(api_key=os.environ["GEMZ_API_KEY"]) 
+    
+    # Mock response for assignment demo
+    return {"summary": f"AI Summary: This post talks about {req.text[:20]}..."}
 
 @app.post("/api/posts/")
 def create_post(post: PostCreate):
@@ -68,7 +82,8 @@ def update_post(post_id: int, post: PostUpdate):
     c.execute("SELECT id FROM posts WHERE id=?", (post_id,))
     if not c.fetchone():
         conn.close()
-        raise HTTPException(status_code=404,Jf detail="Post not found")
+        # 2. Fixed the 'Jf' typo here
+        raise HTTPException(status_code=404, detail="Post not found")
 
     c.execute(
         "UPDATE posts SET content=?, updated_at=? WHERE id=?",
@@ -86,16 +101,3 @@ def publish_post(post_id: int):
     conn.commit()
     conn.close()
     return {"status": "published"}
-import google.generativeai as genai
-import os
-
-# Configure your API key (Export this in your terminal or use .env)
-# genai.configure(api_key=os.environ["GEMZ_API_KEY"]) 
-
-class AIRequest(BaseModel):
-    text: str
-
-@app.post("/api/ai/generate")
-def generate_summary(req: AIRequest):
-    # Mock response if no key is present for the assignment demo
-    return {"summary": f"AI Summary: This post talks about {req.text[:20]}..."}
