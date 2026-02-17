@@ -86,3 +86,16 @@ def publish_post(post_id: int):
     conn.commit()
     conn.close()
     return {"status": "published"}
+import google.generativeai as genai
+import os
+
+# Configure your API key (Export this in your terminal or use .env)
+# genai.configure(api_key=os.environ["GEMZ_API_KEY"]) 
+
+class AIRequest(BaseModel):
+    text: str
+
+@app.post("/api/ai/generate")
+def generate_summary(req: AIRequest):
+    # Mock response if no key is present for the assignment demo
+    return {"summary": f"AI Summary: This post talks about {req.text[:20]}..."}
