@@ -23,13 +23,16 @@ export const useAutoSave = (delay = 2000) => {
       const data = await response.json();
       
       // If it was a new post, save the ID so future edits are updates (PATCH), not new creates (POST)
+      // ... inside saveContent function ...
       if (!postId && data.id) {
         setPostId(data.id);
       }
       
-      console.log('Saved successfully at', newDgite());
+      // FIX: Change newDgite() to new Date().toLocaleTimeString()
+      console.log('Saved successfully at', new Date().toLocaleTimeString()); 
     } catch (error) {
       console.error('Auto-save failed:', error);
+// ...
     } finally {
       setIsSaving(false);
     }
