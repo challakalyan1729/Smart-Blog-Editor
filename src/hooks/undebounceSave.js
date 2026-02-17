@@ -1,53 +1,60 @@
-import { useEffect, useRef, useCallback } from 'react';
-import { useEditorStore } from '../store/useEditorStore';
+import { useCallback, useEffect, useRef } from 'react'
+import { useEditorStore } from '../store/useEditorStore'
 
-export const useAutoSave = (delay = 2000) => {
-  const { editorState, postId, setPostId, setIsSaving } = useEditorStore();
-  const timerRef = useRef(null);
+export const useAutoSave = (delayMs = 1200) => {
+  const editorState = useEditorStore((state) => state.editorState)
+  const contentText = useEditorStore((state) => state.contentText)
+  const changeToken = useEditorStore((state) => state.changeToken)
+  const hasUnsavedChanges = useEditorStore((state) => state.hasUnsavedChanges)
+  const persistSnapshot = useEditorStore((state) => state.persistSnapshot)
 
-  const saveContent = useCallback(async (content) => {
-    setIsSaving(true);
-    try {
-      const endpoint = postId 
-        ? `http://127.0.0.1:8000/api/posts/${postId}` 
-        : `http://127.0.0.1:8000/api/posts/`;
-      
-      const method = postId ? 'PATCH' : 'POST';
+  const debounceTimerRef = useRef(null)
+  const queuedSnapshotRef = useRef(null)
+  const isSavingRef = useRef(false)
 
-      const response = await fetch(endpoint, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ content: JSON.stringify(content) }),
-      });
-
-      const data = await response.json();
-      
-      // If it was a new post, save the ID so future edits are updates (PATCH), not new creates (POST)
-      // ... inside saveContent function ...
-      if (!postId && data.id)
-        { setPostId(data.id); }
-      }
-      
-      // FIX: Change newDgite() to new Date().toLocaleTimeString()
-      console.log('Saved successfully at', new Date().toLocaleTimeString()); 
-    } catch (error) {
-      console.error('Auto-save failed:', error);
-// ...
-    } finally {
-      setIsSaving(false);
+  const flushQueue = useCallback(async () => {
+    if (isSavingRef.current || !queuedSnapshotRef.current) {
+      return
     }
-  }, [postId, setPostId, setIsSaving]);
+
+    isSavingRef.current = true
+    const snapshot = queuedSnapshotRef.current
+    queuedSnapshotRef.current = null
+
+    try {
+      await persistSnapshot(snapshot)
+    } catch {
+      // Error state is tracked in store.
+    } finally {
+      isSavingRef.current = false
+      if (queuedSnapshotRef.current) {
+        void flushQueue()
+      }
+    }
+  }, [persistSnapshot])
 
   useEffect(() => {
-    if (!editorState) return;
+    if (!hasUnsavedChanges || !editorState) {
+      return undefined
+    }
 
-    // DSA Logic: Clear previous timer if user types again before delay finishes
-    if (timerRef.current) clearTimeout(timerRef.current);
+    if (debounceTimerRef.current) {
+      clearTimeout(debounceTimerRef.current)
+    }
 
-    timerRef.current = setTimeout(() => {
-      saveContent(editorState);
-    }, delay);
+    debounceTimerRef.current = setTimeout(() => {
+      queuedSnapshotRef.current = {
+        content_json: editorState,
+        content_text: contentText,
+        changeToken,
+      }
+      void flushQueue()
+    }, delayMs)
 
-    return () => clearTimeout(timerRef.current);
-  }, [editorState, saveContent, delay]);
-};
+    return () => {
+      if (debounceTimerRef.current) {
+        clearTimeout(debounceTimerRef.current)
+      }
+    }
+  }, [editorState, contentText, changeToken, hasUnsavedChanges, delayMs, flushQueue])
+}

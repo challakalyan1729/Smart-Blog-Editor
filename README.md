@@ -1,16 +1,78 @@
-# React + Vite
+# Smart Blog Editor
 
-This template provides a minimal setup to get React working in Vite with HMR and some ESLint rules.
+Production-ready full stack blog editor built for the "Notion-style editor + robust state management" assignment.
 
-Currently, two official plugins are available:
+## Tech Stack
+- Frontend: React + Tailwind CSS + Zustand + Lexical
+- Backend: FastAPI (Python)
+- Database: SQLite
 
-- [@vitejs/plugin-react](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react) uses [Babel](https://babeljs.io/) (or [oxc](https://oxc.rs) when used in [rolldown-vite](https://vite.dev/guide/rolldown)) for Fast Refresh
-- [@vitejs/plugin-react-swc](https://github.com/vitejs/vite-plugin-react/blob/main/packages/plugin-react-swc) uses [SWC](https://swc.rs/) for Fast Refresh
+## Features Implemented
+- Rich text editor with Lexical (bold, italic, headings, ordered list, unordered list, history undo/redo).
+- Global state management with Zustand:
+  - current editor state
+  - draft list
+  - selected post
+  - save/publish/AI status
+- REST APIs for draft creation, update, listing, fetch-by-id, and publish.
+- Intelligent auto-save:
+  - custom debounce + queue flow
+  - avoids API call on every keystroke
+  - handles edits made while a save request is still in flight
+- AI integration:
+  - `Generate Summary`
+  - `Fix Grammar`
+  - streamed response from backend into UI.
 
-## React Compiler
+## API Endpoints
+- `POST /api/posts/` create draft
+- `PATCH /api/posts/{id}` update draft content
+- `POST /api/posts/{id}/publish` publish draft
+- `GET /api/posts/` list all drafts/posts
+- `GET /api/posts/{id}` fetch one post
+- `POST /api/ai/generate` stream AI summary/grammar response
 
-The React Compiler is not enabled on this template because of its impact on dev & build performances. To add it, see [this documentation](https://react.dev/learn/react-compiler/installation).
+## Setup Instructions
 
-## Expanding the ESLint configuration
+### 1. Frontend
+```bash
+npm install
+npm run dev
+```
+Runs on: `http://127.0.0.1:5173`
 
-If you are developing a production application, we recommend using TypeScript with type-aware lint rules enabled. Check out the [TS template](https://github.com/vitejs/vite/tree/main/packages/create-vite/template-react-ts) for information on how to integrate TypeScript and [`typescript-eslint`](https://typescript-eslint.io) in your project.
+### 2. Backend
+Create and activate virtual environment, then install backend deps:
+```bash
+python -m venv venv
+venv\Scripts\activate
+pip install -r requirements.txt
+python -m uvicorn src.backend.main:app --reload --port 8000
+```
+Runs on: `http://127.0.0.1:8000`
+
+## Auto-Save Logic (Debounce + Queue)
+Implemented in `src/hooks/undebounceSave.js`:
+- Every editor change updates Zustand (`changeToken` increments).
+- Debounce waits `1200ms` after last keystroke before queueing a save.
+- Queue keeps latest snapshot while one request is in flight.
+- If user keeps typing during a save, newest snapshot is saved immediately after the current request finishes.
+
+Result: minimal API spam, ordered updates, and no lost edits during async saves.
+
+## Database Schema Choice
+Table: `posts`
+- `content_json`: stores Lexical JSON document state directly (lossless rehydration).
+- `content_text`: plain text used for quick previews and AI input.
+- `status`: `draft` or `published`.
+- `title`: inferred from content for list UX.
+- `created_at`, `updated_at`: auditing and sorting.
+
+Reasoning: storing Lexical JSON preserves editor fidelity; text column supports lightweight querying and previews.
+
+## Architecture Documentation
+- `ARCHITECTURE.md` (includes system diagram and file-level design).
+
+## Demo Deliverables
+- Demo video link: add your Loom/YouTube URL here.
+- Deployed link: add your deployment URL here (e.g. Vercel + Render/Railway).
