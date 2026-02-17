@@ -13,6 +13,10 @@ function ToolButton({ label, onClick, disabled = false }) {
   return (
     <button
       type="button"
+      onMouseDown={(event) => {
+        // Keep Lexical selection active when toolbar buttons are clicked.
+        event.preventDefault()
+      }}
       onClick={onClick}
       disabled={disabled}
       className={`${buttonStyles} ${disabled ? 'cursor-not-allowed opacity-50' : ''}`}

@@ -19,6 +19,27 @@ from pydantic import BaseModel, Field
 ROOT_DIR = Path(__file__).resolve().parents[2]
 DB_PATH = ROOT_DIR / "blog.db"
 
+
+def load_env_file() -> None:
+    env_file = ROOT_DIR / ".env"
+    if not env_file.exists():
+        return
+
+    for raw_line in env_file.read_text(encoding="utf-8").splitlines():
+        line = raw_line.strip()
+        if not line or line.startswith("#") or "=" not in line:
+            continue
+
+        key, value = line.split("=", 1)
+        key = key.strip()
+        if not key or key in os.environ:
+            continue
+
+        os.environ[key] = value.strip().strip('\"').strip("'")
+
+
+load_env_file()
+
 DEFAULT_EDITOR_STATE = {
     "root": {
         "children": [
@@ -202,7 +223,7 @@ def fallback_grammar_fix(text: str) -> str:
 
 
 def try_gemini(mode: Literal["summary", "grammar"], text: str) -> str | None:
-    api_key = os.getenv("GEMINI_API_KEY")
+    api_key = os.getenv("GEMINI_API_KEY") or os.getenv("gemini_api_key")
     if not api_key:
         return None
 
